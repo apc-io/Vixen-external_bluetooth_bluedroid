@@ -4339,7 +4339,7 @@ void btm_sec_disconnected (UINT16 handle, UINT8 reason)
         return;
 
 #if BTM_DISC_DURING_RS == TRUE
-    BTM_TRACE_ERROR0("btm_sec_disconnected - Clearing Pending flag");
+    BTM_TRACE_ERROR1("btm_sec_disconnected - Clearing Pending flag,reason:0x%x\n",reason);
     p_dev_rec->rs_disc_pending = BTM_SEC_RS_NOT_PENDING;     /* reset flag */
 #endif
 

@@ -41,7 +41,7 @@
 #endif
 
 #ifdef HAS_BDROID_BUILDCFG
-#include "bdroid_buildcfg.h"
+//#include "bdroid_buildcfg.h"
 #endif
 
 #endif
@@ -108,6 +108,14 @@
 
 #ifndef SBC_NO_PCM_CPY_OPTION
 #define SBC_NO_PCM_CPY_OPTION FALSE
+#endif
+
+#ifndef SBC_IPAQ_OPT
+#define SBC_IPAQ_OPT FALSE
+#endif
+
+#ifndef SBC_IS_64_MULT_IN_QUANTIZER
+#define SBC_IS_64_MULT_IN_QUANTIZER FALSE
 #endif
 
 #ifndef BTA_INCLUDED
@@ -1036,7 +1044,12 @@ and USER_HW_DISABLE_API macros */
 *
 */
 #ifndef BTA_DM_COD
-#define BTA_DM_COD {0x5A, 0x02, 0x0C}
+#define LAPTOP
+#ifndef LAPTOP
+	#define BTA_DM_COD {0x5A, 0x02, 0x0C}//for smart phone
+#else
+	#define BTA_DM_COD {0x5A, 0x01, 0x0C}//for laptop or mid
+#endif
 #endif
 
 /* The number of SCO links. */
@@ -1081,9 +1094,11 @@ and USER_HW_DISABLE_API macros */
 #endif
 
 /* Fixed Default String (Ignored if BTM_USE_DEF_LOCAL_NAME is FALSE) */
-#ifndef BTM_DEF_LOCAL_NAME
-#define BTM_DEF_LOCAL_NAME      ""
-#endif
+//#ifndef BTM_DEF_LOCAL_NAME
+//#define BTM_DEF_LOCAL_NAME      ""
+//#endif
+extern  char BTM_DEF_LOCAL_NAME[64];
+
 
 /* Maximum service name stored with security authorization (0 if not needed) */
 #ifndef BTM_SEC_SERVICE_NAME_LEN
@@ -1218,11 +1233,6 @@ and USER_HW_DISABLE_API macros */
 #define BTM_BLE_CONFORMANCE_TESTING           FALSE
 #endif
 
-/* Maximum number of consecutive HCI commands  that can time out
-* before  it gets treated as H/w error*/
-#ifndef BTM_MAX_HCI_CMD_TOUT_BEFORE_RESTART
-#define BTM_MAX_HCI_CMD_TOUT_BEFORE_RESTART 2
-#endif
 
 /******************************************************************************
 **
@@ -1310,7 +1320,7 @@ and USER_HW_DISABLE_API macros */
 
 /* Minimum number of ACL credit for high priority link */
 #ifndef L2CAP_HIGH_PRI_MIN_XMIT_QUOTA
-#define L2CAP_HIGH_PRI_MIN_XMIT_QUOTA       5
+#define L2CAP_HIGH_PRI_MIN_XMIT_QUOTA       4
 #endif
 
 /* used for monitoring HCI ACL credit management */
@@ -3661,7 +3671,9 @@ The maximum number of payload octets that the local device can receive in a sing
 ******************************************************************************/
 
 #ifndef HCILP_INCLUDED
+/*NOTE: should be used with CFG_BT_File.h together*/
 #define HCILP_INCLUDED                  TRUE
+//#define HCILP_INCLUDED                  FALSE
 #endif
 
 /******************************************************************************

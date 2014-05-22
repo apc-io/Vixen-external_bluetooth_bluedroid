@@ -203,7 +203,7 @@
 
 /* The number of buffers in buffer pool 3. */
 #ifndef GKI_BUF3_MAX
-#define GKI_BUF3_MAX                200
+#define GKI_BUF3_MAX                400
 #endif
 
 /* The ID of buffer pool 3. */
