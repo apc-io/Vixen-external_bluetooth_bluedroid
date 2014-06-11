@@ -28,6 +28,8 @@
 #define LOG_TAG "bte_conf"
 
 #include <utils/Log.h>
+#include <cutils/properties.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -49,7 +51,9 @@ int logging_cfg_onoff(char *p_conf_name, char *p_conf_value);
 int logging_set_filepath(char *p_conf_name, char *p_conf_value);
 int trace_cfg_onoff(char *p_conf_name, char *p_conf_value);
 
-BD_NAME local_device_default_name = BTM_DEF_LOCAL_NAME;
+char BTM_DEF_LOCAL_NAME[64];
+
+BD_NAME local_device_default_name ;//= BTM_DEF_LOCAL_NAME;
 DEV_CLASS local_device_default_class = {0x40, 0x02, 0x0C};
 
 /******************************************************************************
@@ -173,6 +177,51 @@ int trace_cfg_onoff(char *p_conf_name, char *p_conf_value)
     return 0;
 }
 
+int cut_strings(char const*src,  char *dest,unsigned int cut_len)
+{
+//android-1452541bdc3bff90
+	if(cut_len>strlen(src) || cut_len <= 0){
+		ALOGI("cut_len is error:%d\n",cut_len);
+		return -1;
+	}
+	ALOGI("src_len:%d\n",strlen(src));
+	strcpy(dest,src+strlen(src)-cut_len);
+	ALOGI("src:%s\n",src);
+	ALOGI("dest:%s\n",dest);
+	return 0;
+}
+void customize_bluetooth_name()
+{
+	 char tmpbuf[64];
+	 char tmpbuf1[32];
+	memset(BTM_DEF_LOCAL_NAME,0,sizeof(BTM_DEF_LOCAL_NAME));
+	memset(tmpbuf,0,sizeof(tmpbuf));
+	memset(tmpbuf1,0,sizeof(tmpbuf1));
+
+
+    if (property_get("ro.bluetooth.fullname", BTM_DEF_LOCAL_NAME, NULL))
+	{
+		ALOGI("using property variant:ro.bluetooth.fullname:%s to customize bluetooth name\n",BTM_DEF_LOCAL_NAME);
+        return;
+	}
+
+	if (property_get("ro.bluetooth.name", BTM_DEF_LOCAL_NAME, NULL))
+	{
+		ALOGI("using property variant:ro.bluetooth.name:%s to customize bluetooth name\n",BTM_DEF_LOCAL_NAME);
+	}else{
+		if (property_get("ro.product.model", BTM_DEF_LOCAL_NAME, "Android Bluedroid")){
+			ALOGI("using ro.product.model:%s customize bluetooth name\n",BTM_DEF_LOCAL_NAME);
+		}
+	}
+	
+	if (property_get("net.hostname", tmpbuf, NULL)){
+		cut_strings(tmpbuf, tmpbuf1,4);
+		strcat(BTM_DEF_LOCAL_NAME,tmpbuf1);
+		ALOGI("BTM_DEF_LOCAL_NAME:%s\n",BTM_DEF_LOCAL_NAME);
+	}
+	
+}
+
 /*****************************************************************************
 **   CONF INTERFACE FUNCTIONS
 *****************************************************************************/
@@ -197,7 +246,7 @@ void bte_load_conf(const char *p_path)
     BOOLEAN name_matched;
 
     ALOGI("Attempt to load stack conf from %s", p_path);
-
+    customize_bluetooth_name();
     if ((p_file = fopen(p_path, "r")) != NULL)
     {
         /* read line by line */

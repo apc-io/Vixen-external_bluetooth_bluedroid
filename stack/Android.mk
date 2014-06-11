@@ -134,7 +134,7 @@ LOCAL_SRC_FILES:= \
 LOCAL_MODULE := libbt-brcm_stack
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := STATIC_LIBRARIES
-LOCAL_SHARED_LIBRARIES := libcutils libc
+LOCAL_SHARED_LIBRARIES := libcutils libc libdl
 
 include $(BUILD_STATIC_LIBRARY)
 

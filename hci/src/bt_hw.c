@@ -66,6 +66,11 @@ static void fwcfg_cb(bt_vendor_op_result_t result)
 {
     bt_hc_postload_result_t status = (result == BT_VND_OP_RESULT_SUCCESS) ? \
                                      BT_HC_PRELOAD_SUCCESS : BT_HC_PRELOAD_FAIL;
+     if(result == BT_VND_OP_RESULT_FAIL){
+		ALOGE("received fw cfg failed\n");
+		bthc_signal_event(HC_EVENT_RESTART);//todo: inform bt_hc_worker_thread to restart bt hardware modules
+		return;
+    }
 
     if (bt_hc_cbacks)
         bt_hc_cbacks->preload_cb(NULL, status);

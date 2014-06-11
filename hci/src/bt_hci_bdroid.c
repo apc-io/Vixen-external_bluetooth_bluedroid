@@ -105,7 +105,11 @@ void bthc_signal_event(uint16_t event)
     pthread_cond_signal(&hc_cb.cond);
     pthread_mutex_unlock(&hc_cb.mutex);
 }
-
+int get_ready_events(void)
+{
+	ALOGE("count:0x%x\n",tx_q.count);
+	return tx_q.count;
+}
 /*****************************************************************************
 **
 **   BLUETOOTH HOST/CONTROLLER INTERFACE LIBRARY FUNCTIONS
@@ -377,6 +381,30 @@ static void *bt_hc_worker_thread(void *arg)
         if (events & HC_EVENT_PRELOAD)
         {
             userial_open(USERIAL_PORT_1);
+
+            /* Calling vendor-specific part */
+            if (bt_vnd_if)
+            {
+                bt_vnd_if->op(BT_VND_OP_FW_CFG, NULL);
+            }
+            else
+            {
+                if (bt_hc_cbacks)
+                    bt_hc_cbacks->preload_cb(NULL, BT_HC_PRELOAD_FAIL);
+            }
+        }
+	//added by rubbit
+	 if (events & HC_EVENT_RESTART)
+        {
+            ALOGI("enter bluetooth chip restart branch\n");
+	     p_hci_if->rcv();//drain out remaining rev data
+	     userial_close();
+
+	     set_power(BT_HC_CHIP_PWR_OFF);
+	     set_power(BT_HC_CHIP_PWR_ON);
+		
+            userial_open(USERIAL_PORT_1);
+	     p_hci_if->rcv();//drain out remaining rev data
 
             /* Calling vendor-specific part */
             if (bt_vnd_if)

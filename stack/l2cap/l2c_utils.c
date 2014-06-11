@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <corkscrew/backtrace.h>
+//#include <dlfcn.h>
 
 #include "gki.h"
 #include "bt_types.h"
@@ -779,6 +781,75 @@ void l2cu_send_peer_config_rej (tL2C_CCB *p_ccb, UINT8 *p_data, UINT16 data_len,
     l2c_link_check_send_pkts (p_ccb->p_lcb, NULL, p_buf);
 }
 
+#define MAX_DEPTH                       31  
+#define MAX_BACKTRACE_LINE_LENGTH   800  
+#define PATH "/system/lib/libcorkscrew.so"  
+  
+typedef ssize_t (*unwindFn)(backtrace_frame_t*, size_t, size_t);  
+typedef void (*unwindSymbFn)(const backtrace_frame_t*, size_t, backtrace_symbol_t*);  
+typedef void (*unwindSymbFreeFn)(backtrace_symbol_t*, size_t);  
+  
+static void *gHandle = NULL;  
+  
+static int getCallStack(void){  
+    ssize_t i = 0;  
+    ssize_t result = 0;  
+    ssize_t count;  
+    backtrace_frame_t mStack[MAX_DEPTH];  
+    backtrace_symbol_t symbols[MAX_DEPTH];  
+  
+    unwindFn unwind_backtrace = NULL;  
+    unwindSymbFn get_backtrace_symbols = NULL;  
+    unwindSymbFreeFn free_backtrace_symbols = NULL;  
+  
+    // open the so.  
+    if(gHandle == NULL) gHandle = dlopen(PATH, 0);  
+  
+    // get the interface for unwind and symbol analyse  
+    if(gHandle != NULL) unwind_backtrace = (unwindFn)dlsym(gHandle, "unwind_backtrace");  
+    if(gHandle != NULL) get_backtrace_symbols = (unwindSymbFn)dlsym(gHandle, "get_backtrace_symbols");  
+    if(gHandle != NULL) free_backtrace_symbols = (unwindSymbFreeFn)dlsym(gHandle, "free_backtrace_symbols");  
+  
+    if(!gHandle ||!unwind_backtrace ||!get_backtrace_symbols || !free_backtrace_symbols  ){  
+        L2CAP_TRACE_WARNING4("Error! cannot get unwind info: handle:%p %p %p %p",  
+            gHandle, unwind_backtrace, get_backtrace_symbols, free_backtrace_symbols );  
+        return result;  
+    }  
+  
+    count= unwind_backtrace(mStack, 1, MAX_DEPTH);  
+    get_backtrace_symbols(mStack, count, symbols);  
+  
+    for (i = 0; i < count; i++) {  
+        char line[MAX_BACKTRACE_LINE_LENGTH];  
+  
+        const char* mapName = symbols[i].map_name ? symbols[i].map_name : "<unknown>";  
+        const char* symbolName =symbols[i].demangled_name ? symbols[i].demangled_name : symbols[i].symbol_name;  
+        size_t fieldWidth = (MAX_BACKTRACE_LINE_LENGTH - 80) / 2;  
+          
+        if (symbolName) {  
+            uint32_t pc_offset = symbols[i].relative_pc - symbols[i].relative_symbol_addr;  
+            if (pc_offset) {  
+                snprintf(line, MAX_BACKTRACE_LINE_LENGTH, "#%02d  pc %08x  %.*s (%.*s+%u)",  
+                        i, symbols[i].relative_pc, fieldWidth, mapName,  
+                        fieldWidth, symbolName, pc_offset);  
+            } else {  
+                snprintf(line, MAX_BACKTRACE_LINE_LENGTH, "#%02d  pc %08x  %.*s (%.*s)",  
+                        i, symbols[i].relative_pc, fieldWidth, mapName,  
+                        fieldWidth, symbolName);  
+            }  
+        } else {  
+            snprintf(line, MAX_BACKTRACE_LINE_LENGTH, "#%02d  pc %08x  %.*s",  
+                    i, symbols[i].relative_pc, fieldWidth, mapName);  
+        }  
+  
+        L2CAP_TRACE_WARNING1("%s", line);  
+    }  
+  
+    free_backtrace_symbols(symbols, count);  
+  
+    return result;  
+} 
+
 /*******************************************************************************
 **
 ** Function         l2cu_send_peer_disc_req
@@ -793,6 +864,8 @@ void l2cu_send_peer_disc_req (tL2C_CCB *p_ccb)
 {
     BT_HDR  *p_buf, *p_buf2;
     UINT8   *p;
+    L2CAP_TRACE_WARNING0("enter ------------------------------------------------->");
+     getCallStack();
 
     /* Create an identifier for this packet */
     p_ccb->p_lcb->id++;

@@ -233,6 +233,16 @@ void lpm_vnd_cback(uint8_t vnd_result)
 }
 
 
+int lpm_state_disabled(void)
+{
+	if(bt_lpm_cb.state == LPM_DISABLED){
+		return 1;
+	}else{
+		return 0;
+	}
+}
+
+
 /*****************************************************************************
 **   Low Power Mode Interface Functions
 *****************************************************************************/
@@ -369,6 +379,26 @@ void lpm_wake_assert(void)
     }
 
     lpm_tx_done(FALSE);
+}
+
+void lpm_wake_assert1(void)
+{
+    if (bt_lpm_cb.state != LPM_DISABLED)
+    {
+        BTLPMDBG("LPM WAKE assert");
+
+        /* Calling vendor-specific part */
+        if (bt_vnd_if)
+        {
+            uint8_t state = BT_VND_LPM_WAKE_ASSERT;
+            bt_vnd_if->op(BT_VND_OP_LPM_WAKE_SET_STATE, &state);
+        }
+
+        lpm_stop_transport_idle_timer();
+
+        bt_lpm_cb.wake_state = LPM_WAKE_ASSERTED;
+    }
+
 }
 
 /*******************************************************************************

@@ -453,7 +453,7 @@ static char *alloc(int size)
 
     if (p_hdr == NULL)
     {
-        APPL_TRACE_WARNING0("alloc returns NO BUFFER!");
+        APPL_TRACE_WARNING1("alloc returns NO BUFFER!size:0x%x\n",size);
     }
 
     return ((char *) p_hdr);

@@ -34,9 +34,12 @@ typedef enum {
 /*******************************************************************************
 **  Functions
 ********************************************************************************/
+//#define BT_DEBUG 1
+#define BT_DEBUG 0
 
 void bt_utils_init();
 void bt_utils_cleanup();
 void raise_priority_a2dp(tHIGH_PRIORITY_TASK high_task);
+int array2strings(char* header, char * array_buf, int array_len);
 
 #endif /* BT_UTILS_H */

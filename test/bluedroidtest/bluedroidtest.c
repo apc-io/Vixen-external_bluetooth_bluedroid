@@ -46,6 +46,13 @@
 #include <hardware/hardware.h>
 #include <hardware/bluetooth.h>
 
+#include <semaphore.h>
+
+
+
+sem_t sem;
+
+
 /************************************************************************************
 **  Constants & Macros
 ************************************************************************************/
@@ -125,7 +132,7 @@ static void config_permissions(void)
 
     prctl(PR_SET_KEEPCAPS, 1, 0, 0, 0);
 
-    setuid(AID_BLUETOOTH);
+    setuid(0);//setuid(AID_BLUETOOTH);
     setgid(AID_BLUETOOTH);
 
     header.version = _LINUX_CAPABILITY_VERSION;
@@ -157,8 +164,11 @@ void bdt_log(const char *fmt_str, ...)
     vsnprintf(buffer, 1024, fmt_str, ap);
     va_end(ap);
 
-    fprintf(stdout, "%s\n", buffer);
+    fprintf(stdout, "[bdt_qtest]%s\n", buffer);
 }
+
+
+
 
 /*******************************************************************************
  ** Misc helper functions
@@ -353,7 +363,7 @@ void get_bdaddr(const char *str, bt_bdaddr_t *bd) {
 typedef void (t_console_cmd_handler) (char *p);
 
 typedef struct {
-    const char *name;
+    char *name;
     t_console_cmd_handler *handler;
     const char *help;
     unsigned char is_job;
@@ -459,15 +469,49 @@ void check_return_status(bt_status_t status)
     }
 }
 
-static void adapter_state_changed(bt_state_t state)
+static void adapter_state_changed_cb(bt_state_t state)
 {
     bdt_log("ADAPTER STATE UPDATED : %s", (state == BT_STATE_OFF)?"OFF":"ON");
     if (state == BT_STATE_ON) {
         bt_enabled = 1;
+		sem_post(&sem);
     } else {
         bt_enabled = 0;
     }
 }
+
+static  void discovery_state_changed_cb(bt_discovery_state_t state)
+{
+	bdt_log("discovery_state_changed_cb: %s", (state == BT_DISCOVERY_STOPPED)? "BT_DISCOVERY_STOPPED":"BT_DISCOVERY_STARTED");
+}
+
+
+static void thread_evt_cb(bt_cb_thread_evt evt){
+	bdt_log("thread_evt_cb");
+}
+
+
+
+
+
+void device_found_cb(int num_properties,bt_property_t *properties)
+{
+	char info[512] = {0};
+	char* data = NULL;
+	int i = 0;
+
+	bdt_log("device_found_cb++");
+	
+	unsigned char* result =  (unsigned char*) properties->val;
+	fprintf(stdout,"\nBT Device:");
+	for(i = 0 ; i < properties->len; i++){
+		fprintf(stdout," 0x%02X", *(result+i));
+	}
+	fprintf(stdout,"\n");
+
+	sem_post(&sem);bdt_log("device_found_cb--");
+}
+
 
 static void dut_mode_recv(uint16_t opcode, uint8_t *buf, uint8_t len)
 {
@@ -476,16 +520,16 @@ static void dut_mode_recv(uint16_t opcode, uint8_t *buf, uint8_t len)
 
 static bt_callbacks_t bt_callbacks = {
     sizeof(bt_callbacks_t),
-    adapter_state_changed,
+    adapter_state_changed_cb,
     NULL, /*adapter_properties_cb */
     NULL, /* remote_device_properties_cb */
-    NULL, /* device_found_cb */
-    NULL, /* discovery_state_changed_cb */
+    device_found_cb,
+    discovery_state_changed_cb,
     NULL, /* pin_request_cb  */
     NULL, /* ssp_request_cb  */
     NULL, /*bond_state_changed_cb */
     NULL, /* acl_state_changed_cb */
-    NULL, /* thread_evt_cb */
+    thread_evt_cb,
     dut_mode_recv, /*dut_mode_recv_cb */
 };
 
@@ -519,6 +563,28 @@ void bdt_disable(void)
 
     check_return_status(status);
 }
+
+
+void bdt_discovery(void)
+{
+    bdt_log("discovery BT");
+	
+    status = sBtInterface->start_discovery();
+
+    check_return_status(status);
+}
+
+void bdt_cancel_discovery(void)
+{
+    bdt_log("cancel discovery BT");
+	
+    status = sBtInterface->cancel_discovery();
+
+    check_return_status(status);
+}
+
+
+
 void bdt_dut_mode_configure(char *p)
 {
     int32_t mode = -1;
@@ -590,6 +656,17 @@ void do_disable(char *p)
 {
     bdt_disable();
 }
+
+void do_discovery(char *p)
+{
+    bdt_discovery();
+}
+
+void do_cancel_discovery(char *p)
+{
+    bdt_cancel_discovery();
+}
+
 void do_dut_mode_configure(char *p)
 {
     bdt_dut_mode_configure(p);
@@ -622,6 +699,8 @@ const t_cmd console_cmd_list[] =
      /* Init and Cleanup shall be called automatically */
     { "enable", do_enable, ":: enables bluetooth", 0 },
     { "disable", do_disable, ":: disables bluetooth", 0 },
+    { "discovery", do_discovery, ":: start discovery", 0 },
+    { "canceldiscovery",do_cancel_discovery,":: cancel discovery",0},
     { "dut_mode_configure", do_dut_mode_configure, ":: DUT mode - 1 to enter,0 to exit", 0 },
 
     /* add here */
@@ -661,13 +740,16 @@ static void process_cmd(char *p, unsigned char is_job)
     do_help(NULL);
 }
 
+
+
 int main (int argc, char * argv[])
 {
     int opt;
     char cmd[128];
     int args_processed = 0;
     int pid = -1;
-
+	struct timespec ts;
+	
     config_permissions();
     bdt_log("\n:::::::::::::::::::::::::::::::::::::::::::::::::::");
     bdt_log(":: Bluedroid test app starting");
@@ -683,6 +765,7 @@ int main (int argc, char * argv[])
     /* Automatically perform the init */
     bdt_init();
 
+#if 0
     while(!main_done)
     {
         char line[128];
@@ -702,12 +785,40 @@ int main (int argc, char * argv[])
             memset(line, '\0', 128);
         }
     }
+#endif
+
+	//sleep(1);
+
+	sem_init(&sem,0,0);
+
+	memset(&sem,0,sizeof(sem));
+	ts.tv_sec=time(NULL)+20;
+	ts.tv_nsec=0;
+
+	//enable
+	process_cmd(console_cmd_list[2].name,0);
+	//sleep(3);
+	while(sem_timedwait(&sem, &ts) == -1 && errno == EINTR) continue;//sem_timedwait(&sem,&ts);
+
+	bdt_log("start discovery");//discovery
+	process_cmd(console_cmd_list[4].name,0);
+
+	//sem_wait(&sem);
+	while(sem_timedwait(&sem, &ts) == -1 && errno == EINTR) continue;//sem_timedwait(&sem,&ts);bdt_log("wait discovery for 20s");
+
+	//cancel discovery
+	process_cmd(console_cmd_list[5].name,0);
+	//sleep(1);
+
+	//disable
+	process_cmd(console_cmd_list[3].name,0);
 
     /* FIXME: Commenting this out as for some reason, the application does not exit otherwise*/
     //bdt_cleanup();
+	
+	sem_destroy(&sem);
 
     HAL_unload();
-
     bdt_log(":: Bluedroid test app terminating");
 
     return 0;

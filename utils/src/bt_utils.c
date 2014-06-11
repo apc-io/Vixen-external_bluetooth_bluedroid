@@ -137,3 +137,23 @@ void raise_priority_a2dp(tHIGH_PRIORITY_TASK high_task) {
     }
 }
 
+/*print log for debug*/
+int array2strings(char* header, char * array_buf, int array_len)
+{
+#if BT_DEBUG
+	int n,i;
+	uint8_t buf_strings[1600];
+	//IS_DEBUG_ENABLE_CMD_EVENT;
+	memset(buf_strings,0,sizeof(buf_strings));
+	char * tmpbuf = (char * )buf_strings;
+	array_len = (array_len>32)?32:array_len;
+	for(i=0; i<array_len; i++)
+	{
+		n = sprintf(tmpbuf,"0x%x ",array_buf[i]);
+		tmpbuf += n;
+	}
+	ALOGD("%s:len=%d %s", header, array_len, buf_strings);
+#endif
+	return 0;
+}
+
